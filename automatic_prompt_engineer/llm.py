@@ -8,10 +8,11 @@ from abc import ABC, abstractmethod
 import openai
 
 gpt_costs_per_thousand = {
-    'davinci': 0.0200,
-    'curie': 0.0020,
-    'babbage': 0.0005,
-    'ada': 0.0004
+    'text-davinci-002': 0.0200,
+    'text-curie-001': 0.0020,
+    'text-babbage-001': 0.0005,
+    'text-ada-001': 0.0004,
+    'gpt-3.5-turbo': 0.0015
 }
 
 
@@ -157,8 +158,10 @@ class GPT_Forward(LLM):
         response = None
         while response is None:
             try:
-                response = openai.Completion.create(
-                    **config, prompt=prompt)
+                response = openai.ChatCompletion.create(
+                    **config, messages=[
+                        {"role": "user", "content": prompt[0]}
+                    ])
             except Exception as e:
                 if 'is greater than the maximum' in str(e):
                     raise BatchSizeException()
@@ -166,7 +169,7 @@ class GPT_Forward(LLM):
                 print('Retrying...')
                 time.sleep(5)
 
-        return [response['choices'][i]['text'] for i in range(len(response['choices']))]
+        return [response['choices'][i]['message']['content'] for i in range(len(response['choices']))]
 
     def __complete(self, prompt, n):
         """Generates text from the model and returns the log prob data."""
@@ -179,9 +182,12 @@ class GPT_Forward(LLM):
             prompt[i] = prompt[i].replace('[APE]', '').strip()
         response = None
         while response is None:
+            print(prompt)
             try:
-                response = openai.Completion.create(
-                    **config, prompt=prompt)
+                response = openai.ChatCompletion.create(
+                    **config, messages=[
+                        {"role": "user", "content": prompt[0]}
+                    ])
             except Exception as e:
                 print(e)
                 print('Retrying...')
@@ -209,8 +215,10 @@ class GPT_Forward(LLM):
         response = None
         while response is None:
             try:
-                response = openai.Completion.create(
-                    **config, prompt=text)
+                response = openai.ChatCompletion.create(
+                    **config, messages=[
+                        {"role": "user", "content": text[0]}
+                    ])
             except Exception as e:
                 print(e)
                 print('Retrying...')
@@ -258,7 +266,7 @@ class GPT_Forward(LLM):
 
 class GPT_Insert(LLM):
 
-    def __init__(self, config, needs_confirmation=False, disable_tqdm=True):
+    def __init__(self, config, needs_confirmation=True, disable_tqdm=True):
         """Initializes the model."""
         self.config = config
         self.needs_confirmation = needs_confirmation
@@ -316,7 +324,7 @@ class GPT_Insert(LLM):
         response = None
         while response is None:
             try:
-                response = openai.Completion.create(
+                response = openai.ChatCompletion.create(
                     **config, prompt=prefix, suffix=suffix)
             except Exception as e:
                 print(e)
@@ -336,16 +344,16 @@ def gpt_get_estimated_cost(config, prompt, max_tokens):
     n_prompt_tokens = len(prompt) // 4
     # Get the number of tokens in the generated text
     total_tokens = n_prompt_tokens + max_tokens
-    engine = config['gpt_config']['model'].split('-')[1]
+    # engine = config['gpt_config']['model'].split('-')[1]
     costs_per_thousand = gpt_costs_per_thousand
     if engine not in costs_per_thousand:
         # Try as if it is a fine-tuned model
         engine = config['gpt_config']['model'].split(':')[0]
         costs_per_thousand = {
-            'davinci': 0.1200,
-            'curie': 0.0120,
-            'babbage': 0.0024,
-            'ada': 0.0016
+            'text-davinci-002': 0.1200,
+            'text-curie-001': 0.0120,
+            'text-babbage-001': 0.0024,
+            'text-ada-001': 0.0016
         }
     price = costs_per_thousand[engine] * total_tokens / 1000
     return price
